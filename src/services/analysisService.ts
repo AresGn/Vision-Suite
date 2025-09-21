@@ -4,28 +4,99 @@ import type { FaceComparisonResult, FaceDetection } from '../types';
 const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
 
 let modelsLoaded = false;
+let loadingPromise: Promise<void> | null = null;
+
+interface ModelLoadProgress {
+  name: string;
+  loaded: boolean;
+  error?: string;
+}
 
 /**
- * Loads all the required face-api.js models from the CDN.
+ * Loads all the required face-api.js models with optimized progressive loading.
  * This function should be called once when the application starts.
- * @param {(message: string) => void} setLoadingMessage - Callback to update loading message on UI.
+ * @param {(message: string, progress: number, models: ModelLoadProgress[]) => void} setLoadingMessage - Callback to update loading message on UI.
  */
-export async function loadModels(setLoadingMessage: (message: string) => void) {  
+export async function loadModels(
+  setLoadingMessage: (message: string, progress: number, models: ModelLoadProgress[]) => void
+) {
   if (modelsLoaded) return;
+  if (loadingPromise) return loadingPromise;
 
-  const loadWithStatus = (name: string, loader: Promise<any>) => {
-    setLoadingMessage(`Loading ${name}...`);
-    return loader;
+  const models: ModelLoadProgress[] = [
+    { name: 'Face Detector', loaded: false },
+    { name: 'Face Landmarks', loaded: false },
+    { name: 'Face Recognition', loaded: false },
+    { name: 'Age & Gender', loaded: false },
+    { name: 'Face Expressions', loaded: false },
+  ];
+
+  const updateProgress = () => {
+    const loadedCount = models.filter(m => m.loaded).length;
+    const progress = Math.round((loadedCount / models.length) * 100);
+    const currentModel = models.find(m => !m.loaded);
+    const message = currentModel ? `Loading ${currentModel.name}...` : 'Models loaded successfully!';
+    setLoadingMessage(message, progress, [...models]);
   };
-  
-  await Promise.all([
-    loadWithStatus('Face Detector', faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL)),
-    loadWithStatus('Face Landmarks', faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)),
-    loadWithStatus('Face Recognition', faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)),
-    loadWithStatus('Age & Gender', faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL)),
-    loadWithStatus('Face Expressions', faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)),
-  ]);
-  modelsLoaded = true;
+
+  const loadModelWithRetry = async (
+    name: string,
+    loader: () => Promise<any>,
+    maxRetries = 3
+  ): Promise<void> => {
+    const modelIndex = models.findIndex(m => m.name === name);
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        updateProgress();
+        await loader();
+        models[modelIndex].loaded = true;
+        updateProgress();
+        return;
+      } catch (error) {
+        console.warn(`Failed to load ${name} (attempt ${attempt}/${maxRetries}):`, error);
+        if (attempt === maxRetries) {
+          models[modelIndex].error = `Failed after ${maxRetries} attempts`;
+          throw new Error(`Failed to load ${name} after ${maxRetries} attempts`);
+        }
+        // Wait before retry with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+  };
+
+  loadingPromise = (async () => {
+    try {
+      // Load models in priority order (most important first)
+      await loadModelWithRetry('Face Detector', () =>
+        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL)
+      );
+
+      // Load remaining models in parallel for better performance
+      await Promise.all([
+        loadModelWithRetry('Face Landmarks', () =>
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+        ),
+        loadModelWithRetry('Face Recognition', () =>
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ),
+        loadModelWithRetry('Age & Gender', () =>
+          faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL)
+        ),
+        loadModelWithRetry('Face Expressions', () =>
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+        ),
+      ]);
+
+      modelsLoaded = true;
+      setLoadingMessage('All models loaded successfully!', 100, models);
+    } catch (error) {
+      console.error('Failed to load face-api.js models:', error);
+      throw error;
+    }
+  })();
+
+  return loadingPromise;
 }
 
 /**
@@ -88,7 +159,7 @@ export const detectFacesAndDetails = async (imageFile: File): Promise<FaceDetect
     const detections = await faceapi.detectAllFaces(img).withFaceLandmarks().withAgeAndGender().withFaceExpressions();
 
     return detections.map((d: any) => {
-        const dominantEmotion = Object.entries(d.expressions).reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+        const dominantEmotion = Object.entries(d.expressions as Record<string, number>).reduce((a, b) => (b[1] > a[1] ? b : a))[0];
         return {
             age: Math.round(d.age),
             gender: d.gender,

@@ -8,6 +8,7 @@ import RealTimeVerificationTab from './components/tabs/RealTimeVerificationTab';
 import { IconFace, IconAge, IconOcr, IconCamera, IconShieldCheck } from './components/ui/Icons';
 import { loadModels } from './services/analysisService';
 import Spinner from './components/ui/Spinner';
+import EnhancedLoadingScreen from './components/ui/EnhancedLoadingScreen';
 
 type Tab = 'compare' | 'age' | 'ocr' | 'realtime' | 'verify';
 
@@ -39,16 +40,28 @@ const TABS = {
   },
 };
 
+interface ModelLoadProgress {
+  name: string;
+  loaded: boolean;
+  error?: string;
+}
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('compare');
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('Loading Core AI Models...');
+  const [loadingMessage, setLoadingMessage] = useState('Initializing AI Vision Suite...');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [modelProgress, setModelProgress] = useState<ModelLoadProgress[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeApi = async () => {
       try {
-        await loadModels(setLoadingMessage);
+        await loadModels((message, progress, models) => {
+          setLoadingMessage(message);
+          setLoadingProgress(progress);
+          setModelProgress(models);
+        });
         setModelsLoaded(true);
       } catch (err) {
         setError('Failed to load AI models. Please refresh the page.');
@@ -71,13 +84,11 @@ const App: React.FC = () => {
 
   if (!modelsLoaded) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-900">
-        <div className="text-center">
-          <Spinner size="lg" />
-          <p className="mt-4 text-sky-400 font-semibold">{loadingMessage}</p>
-          <p className="text-sm text-slate-400">This may take a moment...</p>
-        </div>
-      </div>
+      <EnhancedLoadingScreen
+        message={loadingMessage}
+        progress={loadingProgress}
+        models={modelProgress}
+      />
     );
   }
 

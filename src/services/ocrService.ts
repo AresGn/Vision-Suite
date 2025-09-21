@@ -4,37 +4,62 @@ import { postProcessText } from './textPostProcessor';
 let worker: Tesseract.Worker | null = null;
 let currentLang: OcrLanguage | null = null;
 let isInitializing = false;
+let initializationPromise: Promise<Tesseract.Worker> | null = null;
 
 /**
- * Gets or initializes the Tesseract worker, ensuring the correct language is loaded.
+ * Gets or initializes the Tesseract worker with optimized caching and reuse.
  * @param language The language to be loaded in the worker.
  * @param logger A callback function to handle worker logs and progress.
  * @returns A promise that resolves with the configured Tesseract.Worker instance.
  */
-const getWorker = async (language: OcrLanguage, logger: (m: any) => void) => {
-  if (isInitializing) {
-    // Wait for the current initialization to finish
-    await new Promise(resolve => setTimeout(resolve, 100));
-    return getWorker(language, logger);
+const getWorker = async (language: OcrLanguage, logger: (m: any) => void): Promise<Tesseract.Worker> => {
+  // If already initializing, wait for the current initialization
+  if (initializationPromise) {
+    await initializationPromise;
   }
 
+  // Create worker if it doesn't exist
   if (!worker) {
-    isInitializing = true;
-    worker = await Tesseract.createWorker({ logger });
-    isInitializing = false;
+    initializationPromise = (async () => {
+      isInitializing = true;
+      try {
+        worker = await Tesseract.createWorker({
+          logger,
+          cachePath: './tesseract-cache', // Enable caching
+          gzip: true // Enable compression for faster downloads
+        });
+        return worker;
+      } finally {
+        isInitializing = false;
+        initializationPromise = null;
+      }
+    })();
+    await initializationPromise;
   }
-  
-  if (currentLang !== language) {
-    isInitializing = true;
-    await worker.loadLanguage(language);
-    await worker.initialize(language);
-    await worker.setParameters({
-      tessedit_pageseg_mode: Tesseract.PSM.AUTO_OSD,
-    });
-    currentLang = language;
-    isInitializing = false;
+
+  // Load language if different from current
+  if (currentLang !== language && worker) {
+    initializationPromise = (async () => {
+      isInitializing = true;
+      try {
+        await worker!.loadLanguage(language);
+        await worker!.initialize(language);
+        await worker!.setParameters({
+          tessedit_pageseg_mode: Tesseract.PSM.AUTO_OSD,
+          tessedit_char_whitelist: '', // Allow all characters for better accuracy
+          preserve_interword_spaces: '1', // Preserve spaces between words
+        });
+        currentLang = language;
+        return worker!;
+      } finally {
+        isInitializing = false;
+        initializationPromise = null;
+      }
+    })();
+    await initializationPromise;
   }
-  return worker;
+
+  return worker!;
 };
 
 /**
