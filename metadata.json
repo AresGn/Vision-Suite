@@ -1,0 +1,7 @@
+{
+  "name": "AI Vision Suite",
+  "description": "A professional suite for visual analysis tasks including face comparison, age estimation, OCR, and real-time detection, built with a modern web interface.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
