@@ -132,7 +132,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="bg-slate-800/50 border-t border-slate-700 text-center p-2 text-xs text-slate-500">
-        <p>AI Vision Suite &copy; 2024. All Rights Reserved. Powered by face-api.js and Tesseract.js.</p>
+        <p>AI Vision Suite &copy;2025. All Rights Reserved. Powered by face-api.js and Tesseract.js.</p>
       </footer>
     </div>
   );

@@ -15,7 +15,7 @@ export const postProcessText = (rawText: string): { processedText: string; extra
   let processedText = rawText;
   
   // Simple common OCR error corrections
-  processedText = processedText.replace(/(\d)O(\d)/g, '$10$2'); // e.g., 2O24 -> 2024
+  processedText = processedText.replace(/(\d)O(\d)/g, '$10$2'); // e.g., 2O24 ->2025
   processedText = processedText.replace(/\sI\s/g, ' 1 '); // standalone I -> 1
   processedText = processedText.replace(/\b(\w+)rn(\w+)\b/g, '$1m$2'); // rn -> m
 
