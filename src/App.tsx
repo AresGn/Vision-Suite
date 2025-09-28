@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import FaceComparisonTab from './components/tabs/FaceComparisonTab';
 import AgeEstimationTab from './components/tabs/AgeEstimationTab';
 import OcrTab from './components/tabs/OcrTab';
+import EnhancedOcrTab from './components/tabs/EnhancedOcrTab';
 import RealTimeTab from './components/tabs/RealTimeTab';
 import RealTimeVerificationTab from './components/tabs/RealTimeVerificationTab';
 import { IconFace, IconAge, IconOcr, IconCamera, IconShieldCheck } from './components/ui/Icons';
@@ -10,7 +11,7 @@ import { loadModels } from './services/analysisService';
 import Spinner from './components/ui/Spinner';
 import EnhancedLoadingScreen from './components/ui/EnhancedLoadingScreen';
 
-type Tab = 'compare' | 'age' | 'ocr' | 'realtime' | 'verify';
+type Tab = 'compare' | 'age' | 'ocr' | 'enhanced-ocr' | 'realtime' | 'verify';
 
 const TABS = {
   compare: {
@@ -27,6 +28,11 @@ const TABS = {
     label: 'OCR Extraction',
     icon: IconOcr,
     component: OcrTab,
+  },
+  'enhanced-ocr': {
+    label: 'Enhanced OCR',
+    icon: IconOcr,
+    component: EnhancedOcrTab,
   },
   realtime: {
     label: 'Real-Time',

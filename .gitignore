@@ -15,6 +15,20 @@ dist-ssr
 # Environment variables
 .env
 
+# Python virtual environment
+venv/
+env/
+.venv
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Models and cache
+public/models/cache/
+*.pt
+*.onnx
+*.pb
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
